@@ -1,0 +1,11 @@
+{      
+    "About":  "Es una tabla hash JSON con: Idtag, Nombre, Foto, Tamainofotoxy",
+
+              "tag1": ["Iker"   ,"./fotos/iker.jpg"     ,[20, 20] ],
+          "tag2": ["SanNi"  ,"./fotos/sanni.jpeg"  ,[30, 20] ],
+              "tag3": ["Idoia"  ,"./fotos/idoia.jpeg" ,[30, 20] ],
+              "tag6": ["Ander"  ,"./fotos/ander.jpeg"   ,[30, 20] ],
+
+    "Autor":  " Copyright (C) Iker De Echaniz 10/9/2013 license GPLv2"   
+
+}

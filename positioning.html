@@ -1,0 +1,165 @@
+<!DOCTYPE html><html><head><title> suPOSi... </title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"><!--
+<!--
+ Copyright (C) Iker De Echaniz 
+ Fecha: 10/9/2013
+ Licencia: GPLv2
+-->
+	<script src="http://code.jquery.com/jquery-1.9.1.js"></script>
+<!--	<script src="http://leafletjs.com/dist/leaflet.js"></script> la nueva version del 2014 tiene un bug en la linea 6-->
+	<script src=./leaflet/leaflet.js></script> // La del 2013 va bien http://leaflet-cdn.s3.amazonaws.com/build/leaflet-0.6.4.zip
+	<link rel="stylesheet" href="http://leafletjs.com/dist/leaflet.css"" />
+
+<style type="text/css">
+body {
+    height: 100%;
+}
+
+#map {
+    position: absolute;
+    width:940;
+    height:640;
+    top: 0%;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #dcc;
+}
+</style>
+
+<meta name="viewport" content="width=device-width, initial-scale=21,  user-scalable=yes">
+</head>
+
+<!-- ======== BODY ======== -->
+
+<body class="">
+<div id="map"></div>
+
+<script type="text/javascript">
+
+//----- CONFIGURACION ----- 
+
+ var posInicialMapa= [ [43.27181], [-2.94008] ];
+ var unplano = "./fotos/deustogrey.png";
+ var esquinasdiagonales = [ [43.27192, -2.93985], [43.27170, -2.94030] ];
+ var factorDeCorreccion= 0.000001;
+
+ L_PREFER_CANVAS = false; // Ajuste fino en embebidos.
+ L_DISABLE_3D    = false;  
+ 
+//----- Cargar MAPAS ----- 
+			 
+ var map = L.map('map').setView([posInicialMapa[0], posInicialMapa[1]], 21); //en Mapbox es L.mapbox.map	
+	L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+//	L.tileLayer('http://{s}.tiles.mapbox.com/v3/MapID/{z}/{x}/{y}.png', {
+
+		zoomControl: true, 	    // En Mapbox funciona y en Leaftlet deberia segun documentacion pero no.
+		reuseTiles: true, 	    // Imprescindible para conexiones 3G
+		unloadInvisibleTiles: true, // Con true mas rapido en interiores pero mas lento en exteriores.
+		minZoom: 18,		    // La resolucion de los mapas publicos no es mayor que 18
+		maxZoom: 22,
+		//attribution: 'Iker, OpenStreetMaps',
+
+	}).addTo(map);
+  
+  map.attributionControl.setPrefix("");     // Que no salga publicidad si no quiero.
+
+  L.imageOverlay(unplano, esquinasdiagonales).addTo(map);
+
+
+ // Quitar siguiente comentario para posicionar planos a mano al usar un plano nuevo.
+ // function andetoy(e) { alert(e.latlng); } map.on('click', andetoy);
+
+
+ if(!window.console){ window.console = {log:function(){} };} // Evitar errores de logeo en navegadores viejos/cutres
+ console.log( "\n --------empezando----------" );
+
+//----- Cargar USUARIOS ----- 
+
+  var th = (function () { // tabla hash
+    var t;
+    $.ajax({
+        "async": false,
+        "global": false,
+        "url": "./hash.json",
+        "dataType": "json",	
+        "success":function (d) { t = d;  console.log( "cargado tabla hash de usuarios" );  	},
+	"error":  function(){		 console.log( "Error cargando tabla hash de usuarios" );}, 
+	"done: ": function(){},
+    });
+    return t;
+  })();  
+           
+  console.log( "Firefox dice que los json estan mal formados desde ruta local aun cuando le digo en ajax el \n"+
+	       "dataType. porque no distingue el content type. Desde un servidor web lo coge bien. Mis ficheros"+
+	       " json son correctos." );
+
+  console.log( "Ejemplo: "+ th["tag1"]);
+
+//----- Cargar PUNTOS ----- 
+
+  var puntos;  
+  var cpc=0; // Contador simple, mira el timestamp si te preocupa un overflow.
+
+  function cargapuntos(){
+
+	$.getJSON("./rtls.geojsoncm", function(p) { puntos = p; })
+		.done(function()  { console.log( "Cargado puntos del rtls "+cpc++ ); })
+		.fail(function()  { console.log( "Error cargando puntos del rtls "+cpc++ ); })
+		.always(function(){ console.log( "" ); });
+  }
+							
+//----- Asignar USUARIOS A PUNTOS y Acondicionarlos ----- 
+
+
+  var hashtagscapas={};
+ 
+  var grupo = L.geoJson(null, {
+
+    onEachFeature: function (k, capa) { //feature, layer
+
+	if ( hashtagscapas[k.properties.name] != undefined){
+	
+		console.log( k.properties.name + " esta repe en este fichero geojson, borrarre su anterior capa"); 
+		map.removeLayer(hashtagscapas[k.properties.name]);  
+		//delete hashtagscapas[k.properties.name]; // no necesario ya que luego se actualizaria.
+	}
+
+	hashtagscapas[k.properties.name] = capa;
+
+  	capa.bindPopup( th[k.properties.name][0]+" ID: " + k.properties.name );
+	capa.setIcon( new L.Icon({ iconUrl: th[k.properties.name][1], iconSize: th[k.properties.name][2] }) );
+
+		 Y=  parseFloat( posInicialMapa[0] ) +  factorDeCorreccion*parseFloat( capa.getLatLng().lat );
+		 X=  parseFloat( posInicialMapa[1] ) +  factorDeCorreccion*parseFloat( capa.getLatLng().lng );
+		 console.log(" X: " +  X + " Y:  "+ Y );
+
+	capa.setLatLng([ Y, X ]); // que sean puntos XY o latlong real depende del sistema de coodenadas
+
+     }
+
+}).addTo(map);
+
+
+//----- REFRESCAR Puntos ----- 
+
+  self.setInterval( function() {
+
+	hashtagscapas={}; // Vaciar el objeto.
+	cargapuntos();
+	limpiapinta(); 
+
+  }, 2000 );  // Para pinchar el bocadillo 2 segundos es el minimo para humanos no gamer. 
+   
+
+//----- PINTAR Posiciones en pantalla ----- 
+
+  function limpiapinta(){
+
+	grupo.clearLayers();   // limpia
+	grupo.addData(puntos); // pinta
+  }
+
+</script>
+
+</body></html>
